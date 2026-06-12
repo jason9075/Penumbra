@@ -80,17 +80,18 @@ export const LIGHT_DATA = [
       <circle cx="0" cy="0" r="4" fill="currentColor" opacity="0.7"/>
       ${Array.from({length:8},(_,i)=>{const a=i*Math.PI/4,x=Math.cos(a)*18,y=Math.sin(a)*18;return `<line x1="${+(Math.cos(a)*5).toFixed(1)}" y1="${+(Math.sin(a)*5).toFixed(1)}" x2="${+x.toFixed(1)}" y2="${+y.toFixed(1)}"/>`}).join('')}
     </svg>`,
-    shape: 'A single point radiating in all directions (360°). Intensity falls off with the inverse square of distance.',
+    shape: 'A sphere radiating in all directions (360°). Intensity falls off with the inverse square of distance; a larger emitter radius widens the penumbra, softening shadow edges. At radius 0 it degenerates into an ideal point light with perfectly hard shadows.',
     uses: ['Bulbs & lamps', 'Candle / flame', 'Explosion flash'],
     params: [
-      { id: 'intensity', label: 'Intensity', unit: '', min: 1, max: 10, step: 0.5, default: 5 },
+      { id: 'intensity', label: 'Intensity', unit: '', min: 1, max: 20, step: 0.5, default: 5 },
+      { id: 'radius', label: 'Radius', unit: ' m', min: 0, max: 0.5, step: 0.05, default: 0.2 },
       { id: 'posX', label: 'Position X', unit: ' m', min: -2.5, max: 2.5, step: 0.1, default: 1.6 },
     ],
     table: {
-      shape: 'Point',
+      shape: 'Point / sphere',
       direction: 'Omnidirectional 360°',
       attenuation: 'Inverse square',
-      shadowEdge: 'Medium',
+      shadowEdge: 'Hard → soft with radius',
       use: 'Bulb, flame',
     },
     miniSvg: `<svg viewBox="-32 -32 64 64" fill="none">
@@ -111,12 +112,14 @@ export const LIGHT_DATA = [
       <p>$$E(r) = \\frac{\\Phi}{4\\pi r^2}$$</p>
       <p>where $\\Phi$ is total luminous flux. Doubling the distance <em>quarters</em> the irradiance.</p>
       <p>Three.js encodes this with the <code>decay</code> parameter — setting <code>decay = 2</code> matches physical behaviour:</p>
-      <pre><code class="language-js">const light = new THREE.PointLight(color, intensity, distance, 2);</code></pre>`,
+      <pre><code class="language-js">const light = new THREE.PointLight(color, intensity, distance, 2);</code></pre>
+      <p>A <strong>point light is the limit case of a sphere light</strong>: as the emitter radius $R \\to 0$, the source subtends zero solid angle from any occluder, the penumbra width $w \\approx R \\cdot d_2 / d_1$ collapses, and shadows become perfectly hard. Any $R > 0$ lets the occluder partially block the source, producing a penumbra that widens with $R$.</p>`,
     mathZh: `<p>點光源遵循<strong>平方反比定律</strong>，距離 $r$ 處的照度：</p>
       <p>$$E(r) = \\frac{\\Phi}{4\\pi r^2}$$</p>
       <p>$\\Phi$ 為總光通量。距離加倍，照度變為四分之一。</p>
       <p>Three.js 以 <code>decay</code> 參數控制衰減，設為 2 即符合物理定律：</p>
-      <pre><code class="language-js">const light = new THREE.PointLight(color, intensity, distance, 2);</code></pre>`,
+      <pre><code class="language-js">const light = new THREE.PointLight(color, intensity, distance, 2);</code></pre>
+      <p><strong>Point Light 其實是球形光源的極限情況</strong>：當發光體半徑 $R \\to 0$，光源對任何遮蔽物的立體角趨近於零，半影寬度 $w \\approx R \\cdot d_2 / d_1$ 隨之消失，陰影邊緣完全銳利。只要 $R > 0$，遮蔽物就只能「部分遮住」光源，形成隨 $R$ 變寬的半影。</p>`,
   },
 
   {
@@ -132,7 +135,7 @@ export const LIGHT_DATA = [
       <line x1="-4" y1="-8" x2="20" y2="-12"/>
       <line x1="-4" y1="8" x2="20" y2="12"/>
     </svg>`,
-    shape: 'A flat rectangular surface emitting light forward. Produces soft shadows and wide even illumination — typical of a softbox.',
+    shape: 'A flat rectangular surface emitting light forward. Physically it produces soft shadows and wide even illumination — typical of a softbox. Note: three.js has no shadow support for area lights, so this demo casts no shadow.',
     uses: ['Softbox / key light', 'Monitor glow', 'Illuminated panel'],
     params: [
       { id: 'width', label: 'Width', unit: ' m', min: 0.5, max: 5, step: 0.1, default: 2.5 },
@@ -142,7 +145,7 @@ export const LIGHT_DATA = [
       shape: 'Rectangle',
       direction: 'Unidirectional',
       attenuation: 'Yes',
-      shadowEdge: 'Soft',
+      shadowEdge: 'Soft (no three.js support)',
       use: 'Softbox, screen',
     },
     miniSvg: `<svg viewBox="-32 -32 64 64" fill="none">
@@ -162,66 +165,13 @@ export const LIGHT_DATA = [
     mathEn: `<p>A rect area light has a finite emitting surface $A = w \\times h$. Irradiance at a point $P$ is computed by integrating over the surface:</p>
       <p>$$E(P) = \\int_A L_e \\frac{\\cos\\theta_e\\,\\cos\\theta_r}{\\pi r^2}\\,dA$$</p>
       <p>$\\theta_e$ is the emission angle from the light surface, $\\theta_r$ is the reception angle at $P$. This integral produces naturally soft penumbra — the shadow softness grows with distance from the receiver.</p>
-      <p>Three.js implements this via <code>RectAreaLight</code> + <code>RectAreaLightUniformsLib</code> using LTC (Linearly Transformed Cosines) approximation.</p>`,
+      <p>Three.js implements this via <code>RectAreaLight</code> + <code>RectAreaLightUniformsLib</code> using LTC (Linearly Transformed Cosines) approximation.</p>
+      <p><strong>Limitation:</strong> LTC evaluates the surface integral analytically for direct lighting only — there is no shadow-map implementation for area lights, so <code>RectAreaLight</code> casts no shadows and <code>castShadow</code> has no effect. Area-light shadows require integrating occluder visibility over the emitting surface, which real-time renderers approximate with multiple shadow-mapped sample lights (as this app's Sphere demo does) or ray tracing.</p>`,
     mathZh: `<p>矩形面光源有有限的發光面積 $A = w \\times h$，點 $P$ 的照度需對面積積分：</p>
       <p>$$E(P) = \\int_A L_e \\frac{\\cos\\theta_e\\,\\cos\\theta_r}{\\pi r^2}\\,dA$$</p>
       <p>$\\theta_e$ 為發光面的出射角，$\\theta_r$ 為 $P$ 點的接收角。此積分自然產生柔和半影——陰影柔化程度隨距離增加而增大。</p>
-      <p>Three.js 透過 <code>RectAreaLight</code> + LTC（線性變換餘弦）近似法實現此效果。</p>`,
-  },
-
-  {
-    id: 'disk',
-    name: 'Disk',
-    subtitle: 'Circular Area Light',
-    icon: '◉',
-    heroSvg: `<svg viewBox="-24 -24 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
-      <ellipse cx="0" cy="-14" rx="10" ry="3" fill="currentColor" fill-opacity="0.2"/>
-      <line x1="-8" y1="-11" x2="-14" y2="18"/>
-      <line x1="0" y1="-11" x2="0" y2="18"/>
-      <line x1="8" y1="-11" x2="14" y2="18"/>
-      <line x1="-10" y1="-14" x2="-18" y2="14"/>
-      <line x1="10" y1="-14" x2="18" y2="14"/>
-    </svg>`,
-    shape: 'A circular emitting surface, common in ceiling fixtures. Produces a round hot-spot with soft circular penumbra.',
-    uses: ['Ceiling downlights', 'Stage follow spot', 'Theatrical disc light'],
-    params: [
-      { id: 'angle', label: 'Cone Angle', unit: '°', min: 5, max: 60, default: 22 },
-      { id: 'height', label: 'Height', unit: ' m', min: 1, max: 4, step: 0.1, default: 2.5 },
-      { id: 'posX', label: 'Position X', unit: ' m', min: -2.5, max: 2.5, step: 0.1, default: 0 },
-    ],
-    table: {
-      shape: 'Circle',
-      direction: 'Unidirectional',
-      attenuation: 'Yes',
-      shadowEdge: 'Soft',
-      use: 'Downlight, spotlight',
-    },
-    miniSvg: `<svg viewBox="-32 -32 64 64" fill="none">
-      <ellipse cx="0" cy="-22" rx="8" ry="3" stroke="var(--warm)" stroke-opacity="0.7" fill="var(--warm)" fill-opacity="0.15"/>
-      <line x1="-7" y1="-19" x2="-18" y2="22" stroke="var(--warm)" stroke-opacity="0.5" stroke-width="1"/>
-      <line x1="7" y1="-19" x2="18" y2="22" stroke="var(--warm)" stroke-opacity="0.5" stroke-width="1"/>
-      <line x1="0" y1="-19" x2="0" y2="22" stroke="var(--warm)" stroke-opacity="0.4" stroke-width="1"/>
-      <ellipse cx="0" cy="24" rx="16" ry="4" stroke="var(--warm)" stroke-opacity="0.25" fill="var(--warm)" fill-opacity="0.08"/>
-    </svg>`,
-    anatomySvg: `<svg viewBox="-100 -100 200 200" fill="none">
-      ${SVG_DEFS}
-      <ellipse cx="0" cy="-72" rx="28" ry="9" fill="var(--warm)" fill-opacity="0.2" stroke="var(--warm)" stroke-opacity="0.8"/>
-      ${[[-22,-63,-34,62],[-10,-63,-14,62],[0,-63,0,62],[10,-63,14,62],[22,-63,34,62]].map(([x1,y1,x2,y2]) =>
-        arrow(x1,y1,x2,y2)
-      ).join('')}
-      <ellipse cx="0" cy="70" rx="38" ry="10" stroke="var(--warm)" stroke-opacity="0.3" fill="var(--warm)" fill-opacity="0.08"/>
-      <text x="0" y="90" text-anchor="middle" font-size="10" fill="var(--mist)" font-family="monospace">round penumbra</text>
-    </svg>`,
-    mathEn: `<p>A disk light is a circular variant of the area light. Its angular distribution follows a cosine lobe:</p>
-      <p>$$L(\\theta) = L_0 \\cos\\theta, \\quad \\theta \\in [0, \\tfrac{\\pi}{2}]$$</p>
-      <p>The circular boundary creates a characteristic round shadow pattern. Penumbra width $w_p$ scales with source radius $r_s$ and receiver distance $d$:</p>
-      <p>$$w_p \\approx 2\\,r_s\\,\\frac{d_{receiver}}{d_{source}}$$</p>
-      <p>In Three.js, a <code>SpotLight</code> with <code>penumbra ∈ (0,1)</code> approximates a disk light's soft circular edge.</p>`,
-    mathZh: `<p>圓形面光源是矩形面光源的圓形變體，其角度分布遵循餘弦波瓣：</p>
-      <p>$$L(\\theta) = L_0 \\cos\\theta, \\quad \\theta \\in [0, \\tfrac{\\pi}{2}]$$</p>
-      <p>圓形邊界產生特有的圓形陰影輪廓。半影寬度 $w_p$ 與光源半徑 $r_s$ 及接收距離 $d$ 成正比：</p>
-      <p>$$w_p \\approx 2\\,r_s\\,\\frac{d_{receiver}}{d_{source}}$$</p>
-      <p>Three.js 中以 <code>SpotLight</code> 搭配 <code>penumbra ∈ (0,1)</code> 近似圓形面光源的柔和邊緣。</p>`,
+      <p>Three.js 透過 <code>RectAreaLight</code> + LTC（線性變換餘弦）近似法實現此效果。</p>
+      <p><strong>限制：</strong>LTC 只解析計算直接光照，three.js 沒有面光源的 shadow map 實作，因此 <code>RectAreaLight</code> 不會投射陰影（<code>castShadow</code> 無效）。面光源陰影需要對發光面上的遮蔽可見性做積分，即時渲染通常以多顆帶陰影的取樣光源近似（如本站 Sphere demo 的做法）或改用光線追蹤。</p>`,
   },
 
   {
@@ -233,9 +183,10 @@ export const LIGHT_DATA = [
       <line x1="-18" y1="0" x2="18" y2="0" stroke-width="2.5"/>
       ${Array.from({length:5},(_,i)=>{const x=-12+i*6;return `<line x1="${x}" y1="0" x2="${x}" y2="16"/><line x1="${x}" y1="0" x2="${x}" y2="-16"/>`}).join('')}
     </svg>`,
-    shape: 'A tube emitting light radially along its length. Axial ends emit almost nothing — characteristic of fluorescent tubes and neon.',
+    shape: 'A tube emitting light radially along its length — this demo simulates a fluorescent tube. Axial ends emit almost nothing. Shadows are soft along the axis even at radius 0 (an ideal line light); increasing the radius thickens the emitter and softens shadows across the axis too.',
     uses: ['Fluorescent tubes', 'Neon / LED strips', 'Backlit panel edges'],
     params: [
+      { id: 'radius', label: 'Radius', unit: ' m', min: 0, max: 0.25, step: 0.01, default: 0.05 },
       { id: 'rotation', label: 'Rotation', unit: '°', min: 0, max: 180, default: 0 },
       { id: 'posX', label: 'Position X', unit: ' m', min: -2.5, max: 2.5, step: 0.1, default: 0 },
     ],
@@ -243,7 +194,7 @@ export const LIGHT_DATA = [
       shape: 'Cylinder',
       direction: 'Radial (no axial)',
       attenuation: 'Yes',
-      shadowEdge: 'Directional',
+      shadowEdge: 'Soft along axis · radius softens across',
       use: 'Fluorescent, neon',
     },
     miniSvg: `<svg viewBox="-32 -32 64 64" fill="none">
@@ -266,10 +217,12 @@ export const LIGHT_DATA = [
     </svg>`,
     mathEn: `<p>A cylinder light emits only in the radial direction. Its emission follows a <strong>directional cosine distribution</strong> perpendicular to the tube axis $\\hat{a}$:</p>
       <p>$$L(\\hat{\\omega}) = L_0\\,\\max(0,\\;\\hat{\\omega} \\cdot \\hat{n}_\\perp)$$</p>
-      <p>where $\\hat{n}_\\perp$ is the normal from the tube surface to the emitted direction. This produces characteristic long-streak highlights and direction-dependent shadows — shadow is sharp across the tube but soft along it.</p>`,
+      <p>where $\\hat{n}_\\perp$ is the normal from the tube surface to the emitted direction. This produces characteristic long-streak highlights and direction-dependent shadows — shadow is sharp across the tube but soft along it.</p>
+      <p>The tube <strong>radius</strong> controls the second axis of softness: at $R = 0$ the source is an ideal line, so shadows stay hard across the axis while the tube length alone softens them along it. A thicker tube ($R > 0$) subtends a wider angle from every occluder, widening the penumbra across the axis as well — the same $w \\approx R \\cdot d_2/d_1$ relation as the sphere light, applied per direction. This demo approximates the tube with shadow-mapped sample lights distributed along the axis and pushed outward by $R$.</p>`,
     mathZh: `<p>圓柱光源僅向徑向發射，其發射遵循垂直管軸 $\\hat{a}$ 的<strong>方向性餘弦分布</strong>：</p>
       <p>$$L(\\hat{\\omega}) = L_0\\,\\max(0,\\;\\hat{\\omega} \\cdot \\hat{n}_\\perp)$$</p>
-      <p>$\\hat{n}_\\perp$ 為管面到發射方向的法向量。這產生特有的長條形高光，以及方向性陰影——垂直管軸方向陰影清晰，平行方向柔和。</p>`,
+      <p>$\\hat{n}_\\perp$ 為管面到發射方向的法向量。這產生特有的長條形高光，以及方向性陰影——垂直管軸方向陰影清晰，平行方向柔和。</p>
+      <p>管子的<strong>半徑</strong>控制第二個方向的柔化：$R = 0$ 時光源是理想線光源（日光燈管的極限近似），垂直管軸方向的陰影完全銳利，僅管長讓平行方向變柔。$R > 0$ 時管身對每個遮蔽物張出更大的立體角，垂直方向的半影也隨之變寬——與球形光源相同的 $w \\approx R \\cdot d_2/d_1$ 關係，只是按方向分別作用。本 demo 以沿軸分佈、再依 $R$ 向外推開的帶陰影取樣光源來近似管狀發光體。</p>`,
   },
 
   {

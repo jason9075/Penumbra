@@ -29,7 +29,7 @@ Always run a build after editing source files to confirm no import/syntax errors
 
 Each light type has its own `WebGLRenderer` + `OrbitControls`. Scenes are **lazy-created** on first tab selection and cached in the `scenes` Map. The `IntersectionObserver` in earlier versions was removed; scenes are now started/stopped directly on tab switch in `selectLight()`.
 
-`mkBase()` in `scenes.js` is the shared setup (renderer, camera, sphere, ground, grid, OrbitControls, resize handler). Every scene factory calls it and adds its own lights, helpers, and annotation arrows.
+`mkBase()` in `scenes.js` is the shared setup (renderer, camera, castle demo subject, ground, grid, OrbitControls, resize handler). The castle is built from primitives in `mkCastle()`; its group origin stays at world `(0, 0, 0)` so lights keep targeting the origin. Every scene factory calls `mkBase` and adds its own lights, helpers, and annotation arrows.
 
 ### Adding a new parameter to an existing light
 

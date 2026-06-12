@@ -3,8 +3,63 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RectAreaLightHelper } from 'three/addons/helpers/RectAreaLightHelper.js';
 
 /* ── Shared geometry ── */
-const SPHERE_GEO = new THREE.SphereGeometry(0.8, 48, 48);
 const GROUND_GEO = new THREE.PlaneGeometry(14, 14);
+
+/* ── Demo subject: castle assembled from primitives ── */
+const STONE_MAT = new THREE.MeshStandardMaterial({ color: '#C0CAD8', roughness: 0.55, metalness: 0.05 });
+const ROOF_MAT = new THREE.MeshStandardMaterial({ color: '#7B85A8', roughness: 0.45, metalness: 0.1 });
+const GATE_MAT = new THREE.MeshStandardMaterial({ color: '#2A2D3A', roughness: 0.9, metalness: 0 });
+
+function mkCastle() {
+  const castle = new THREE.Group();
+  // The group origin stays at world (0, 0, 0) so lights keep aiming at the
+  // origin; children are offset down so the castle base rests on the ground.
+  const BASE = -1.2;
+
+  const add = (geo, mat, x, y, z) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, BASE + y, z);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    castle.add(m);
+    return m;
+  };
+
+  const R = 1.05; // corner-tower offset from centre
+
+  // Corner towers with conical roofs
+  const towerGeo = new THREE.CylinderGeometry(0.2, 0.24, 1.2, 16);
+  const towerRoofGeo = new THREE.ConeGeometry(0.3, 0.5, 16);
+  [[-R, -R], [R, -R], [-R, R], [R, R]].forEach(([x, z]) => {
+    add(towerGeo, STONE_MAT, x, 0.6, z);
+    add(towerRoofGeo, ROOF_MAT, x, 1.45, z);
+  });
+
+  // Curtain walls between the towers
+  const wallGeo = new THREE.BoxGeometry(2 * R, 0.65, 0.16);
+  [[0, -R, 0], [0, R, 0], [-R, 0, Math.PI / 2], [R, 0, Math.PI / 2]].forEach(([x, z, ry]) => {
+    add(wallGeo, STONE_MAT, x, 0.325, z).rotation.y = ry;
+  });
+
+  // Merlons along each wall top
+  const merlonGeo = new THREE.BoxGeometry(0.12, 0.14, 0.18);
+  for (let i = -2; i <= 2; i++) {
+    const t = i * 0.38;
+    add(merlonGeo, STONE_MAT, t, 0.72, -R);
+    add(merlonGeo, STONE_MAT, t, 0.72, R);
+    add(merlonGeo, STONE_MAT, -R, 0.72, t).rotation.y = Math.PI / 2;
+    add(merlonGeo, STONE_MAT, R, 0.72, t).rotation.y = Math.PI / 2;
+  }
+
+  // Central keep with a pyramid roof (4-sided cone, rotated to align with the box)
+  add(new THREE.BoxGeometry(0.9, 1.4, 0.9), STONE_MAT, 0, 0.7, 0);
+  add(new THREE.ConeGeometry(0.7, 0.6, 4), ROOF_MAT, 0, 1.7, 0).rotation.y = Math.PI / 4;
+
+  // Gate recess on the front wall
+  add(new THREE.BoxGeometry(0.36, 0.5, 0.22), GATE_MAT, 0, 0.25, R);
+
+  return castle;
+}
 
 /* ── Emission direction indicator ── */
 function mkArrow(dir, origin, length, color = 0xFFC878, opacity = 0.55) {
@@ -36,29 +91,26 @@ function mkBase(canvas, bgHex = '#0E1016') {
   camera.position.set(0, 1.5, 4.8);
   camera.lookAt(0, 0, 0);
 
+  // Bright matte floor: shadows are the absence of light, so penumbra
+  // gradients only read against a high-albedo diffuse surface.
   const ground = new THREE.Mesh(
     GROUND_GEO,
-    new THREE.MeshStandardMaterial({ color: '#1A1F2C', roughness: 0.9, metalness: 0 }),
+    new THREE.MeshStandardMaterial({ color: '#6E7890', roughness: 0.95, metalness: 0 }),
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -1.2;
   ground.receiveShadow = true;
   scene.add(ground);
 
-  // Subtle grid so the floor plane reads against the dark background
+  // Faint grid — kept subtle so its lines don't compete with shadow edges
   const grid = new THREE.GridHelper(14, 20, 0x39415A, 0x232938);
   grid.position.y = -1.19;
   grid.material.transparent = true;
-  grid.material.opacity = 0.55;
+  grid.material.opacity = 0.25;
   scene.add(grid);
 
-  const sphere = new THREE.Mesh(
-    SPHERE_GEO,
-    new THREE.MeshStandardMaterial({ color: '#C0CAD8', roughness: 0.35, metalness: 0.05 }),
-  );
-  sphere.castShadow = true;
-  sphere.receiveShadow = true;
-  scene.add(sphere);
+  const castle = mkCastle();
+  scene.add(castle);
 
   scene.add(new THREE.AmbientLight('#2A2D3A', 0.5));
 
@@ -81,7 +133,7 @@ function mkBase(canvas, bgHex = '#0E1016') {
   window.addEventListener('resize', resize);
 
   return {
-    renderer, scene, camera, sphere, ground, controls, resize,
+    renderer, scene, camera, castle, ground, controls, resize,
     dispose() {
       window.removeEventListener('resize', resize);
       controls.dispose();
@@ -121,7 +173,7 @@ function mkDistant(canvas) {
   const base = mkBase(canvas);
   const { scene } = base;
 
-  const light = new THREE.DirectionalLight('#F0F4FF', 3);
+  const light = new THREE.DirectionalLight('#FFFFFF', 3);
   light.castShadow = true;
   light.shadow.mapSize.set(1024, 1024);
   Object.assign(light.shadow.camera, { near: 0.5, far: 20, left: -4, right: 4, top: 4, bottom: -4 });
@@ -154,16 +206,33 @@ function mkSphere(canvas) {
   const base = mkBase(canvas);
   const { scene } = base;
 
-  const light = new THREE.PointLight('#FFCC88', 5, 14, 2);
-  light.castShadow = true;
-  light.shadow.mapSize.set(512, 512);
-  scene.add(light);
+  // Spherical emitter approximated by sample lights on the sphere surface
+  // (centre + octahedron vertices). Spreading the samples apart makes their
+  // shadow maps overlap into a real penumbra: radius 0 collapses to a hard
+  // point light, larger radii soften edges and show contact hardening.
+  const OFFSETS = [
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0),
+    new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, -1, 0),
+    new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1),
+  ];
+  const emitter = new THREE.Group();
+  scene.add(emitter);
+
+  const lights = OFFSETS.map(() => {
+    // Low-res maps blur each sub-shadow just enough to blend the samples
+    const l = new THREE.PointLight('#FFFFFF', 5 / OFFSETS.length, 14, 2);
+    l.castShadow = true;
+    l.shadow.mapSize.set(256, 256);
+    emitter.add(l);
+    return l;
+  });
 
   const bulbMesh = new THREE.Mesh(
-    new THREE.SphereGeometry(0.12, 16, 16),
-    new THREE.MeshBasicMaterial({ color: '#FFDD99' }),
+    new THREE.SphereGeometry(1, 24, 24),
+    new THREE.MeshBasicMaterial({ color: '#FFFFFF' }),
   );
-  scene.add(bulbMesh);
+  emitter.add(bulbMesh);
 
   // SpriteMaterial without a map renders as a solid square — bake a radial
   // gradient texture so the glow falls off to fully transparent edges.
@@ -171,9 +240,9 @@ function mkSphere(canvas) {
   glowCanvas.width = glowCanvas.height = 128;
   const ctx = glowCanvas.getContext('2d');
   const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-  grad.addColorStop(0, 'rgba(255, 200, 120, 1)');
-  grad.addColorStop(0.3, 'rgba(255, 170, 68, 0.5)');
-  grad.addColorStop(1, 'rgba(255, 170, 68, 0)');
+  grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+  grad.addColorStop(0.3, 'rgba(255, 255, 255, 0.5)');
+  grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 128, 128);
 
@@ -184,30 +253,34 @@ function mkSphere(canvas) {
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   }));
-  glow.scale.set(1.8, 1.8, 1);
-  scene.add(glow);
+  emitter.add(glow);
 
-  // Omnidirectional emission arrows around the bulb
-  const rayGroup = new THREE.Group();
+  // Omnidirectional emission arrows around the bulb — repositioned by
+  // setRadius so they always start just outside the emitter surface
+  const arrows = [];
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2;
     const dir = new THREE.Vector3(Math.cos(a), Math.sin(a), 0);
-    rayGroup.add(mkArrow(dir, dir.clone().multiplyScalar(0.3), 0.65));
+    const arrow = mkArrow(dir, dir, 0.65);
+    arrow.userData.dir = dir;
+    arrows.push(arrow);
+    emitter.add(arrow);
   }
-  scene.add(rayGroup);
 
-  function setPosition(x) {
-    light.position.set(x, 1.4, 1.4);
-    bulbMesh.position.copy(light.position);
-    glow.position.copy(light.position);
-    rayGroup.position.copy(light.position);
+  function setRadius(r) {
+    lights.forEach((l, i) => l.position.copy(OFFSETS[i]).multiplyScalar(r));
+    bulbMesh.scale.setScalar(Math.max(r, 0.1));
+    glow.scale.set(1.2 + r * 2.5, 1.2 + r * 2.5, 1);
+    arrows.forEach(a => a.position.copy(a.userData.dir).multiplyScalar(Math.max(r, 0.1) + 0.18));
   }
-  setPosition(1.6);
+  setRadius(0.2);
+
+  emitter.position.set(1.6, 1.4, 1.4);
 
   return mkRunner(base, (id, val) => {
-    if (id === 'intensity') light.intensity = val;
-    if (id === 'distance') light.distance = val;
-    if (id === 'posX') setPosition(val);
+    if (id === 'intensity') lights.forEach(l => { l.intensity = val / lights.length; });
+    if (id === 'radius') setRadius(val);
+    if (id === 'posX') emitter.position.x = val;
   });
 }
 
@@ -216,7 +289,7 @@ function mkRect(canvas) {
   const base = mkBase(canvas);
   const { scene } = base;
 
-  const light = new THREE.RectAreaLight('#F0F0FF', 8, 2.5, 2);
+  const light = new THREE.RectAreaLight('#FFFFFF', 8, 2.5, 2);
   light.position.set(-2.5, 1, 1.5);
   light.lookAt(0, 0, 0);
   scene.add(light);
@@ -240,75 +313,13 @@ function mkRect(canvas) {
   });
 }
 
-/* ── Disk (Spot Light) ── */
-function mkDisk(canvas) {
-  const base = mkBase(canvas);
-  const { scene, sphere } = base;
-
-  const light = new THREE.SpotLight('#FFFFFF', 8, 16, Math.PI / 8, 0.45, 1.5);
-  light.position.set(0, 2.5, 0.5);
-  light.target = sphere;
-  light.castShadow = true;
-  light.shadow.mapSize.set(1024, 1024);
-  light.shadow.camera.near = 0.5;
-  light.shadow.camera.far = 18;
-  scene.add(light);
-  scene.add(light.target);
-
-  const diskMesh = new THREE.Mesh(
-    new THREE.CircleGeometry(0.6, 48),
-    new THREE.MeshBasicMaterial({ color: '#FFFFFF', transparent: true, opacity: 0.75, side: THREE.DoubleSide }),
-  );
-  diskMesh.rotation.x = Math.PI / 2;
-  diskMesh.position.copy(light.position);
-  scene.add(diskMesh);
-
-  // Downward emission arrows — outer ones splay to match the cone angle
-  const rayGroup = new THREE.Group();
-  rayGroup.position.copy(light.position);
-  scene.add(rayGroup);
-  rayGroup.add(mkArrow(new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, -0.15, 0), 1.1));
-  const outerArrows = [[-1, 0], [1, 0], [0, -1], [0, 1]].map(([ux, uz]) => {
-    const arrow = mkArrow(new THREE.Vector3(0, -1, 0), new THREE.Vector3(ux * 0.4, -0.15, uz * 0.4), 1.1);
-    arrow.userData.out = new THREE.Vector3(ux, 0, uz);
-    rayGroup.add(arrow);
-    return arrow;
-  });
-
-  function setConeAngle(deg) {
-    const r = (deg * Math.PI) / 180;
-    light.angle = r;
-    outerArrows.forEach(arrow => {
-      const { out } = arrow.userData;
-      arrow.setDirection(
-        new THREE.Vector3(out.x * Math.sin(r), -Math.cos(r), out.z * Math.sin(r)).normalize(),
-      );
-    });
-  }
-  setConeAngle(22);
-
-  return mkRunner(base, (id, val) => {
-    if (id === 'angle') setConeAngle(val);
-    if (id === 'height') {
-      light.position.y = val;
-      diskMesh.position.y = val;
-      rayGroup.position.y = val;
-    }
-    if (id === 'posX') {
-      light.position.x = val;
-      diskMesh.position.x = val;
-      rayGroup.position.x = val;
-    }
-  });
-}
-
 /* ── Cylinder (Tube Light) ── */
 function mkCylinder(canvas) {
   const base = mkBase(canvas);
   const { scene } = base;
 
-  // Centre height + length chosen so the tube clears the 0.8-radius sphere
-  // at every rotation angle (closest approach ≥ 0.9).
+  // Centre height + length chosen so the tube clears the castle (keep roof
+  // tip at y ≈ 0.8) at every rotation angle.
   const tubeH = 2.2;
   const tubeY = 2.0;
 
@@ -317,42 +328,76 @@ function mkCylinder(canvas) {
   lamp.position.set(0, tubeY, 0);
   scene.add(lamp);
 
-  lamp.add(new THREE.Mesh(
-    new THREE.CylinderGeometry(0.05, 0.05, tubeH, 20),
-    new THREE.MeshBasicMaterial({ color: '#F4F8FF' }),
-  ));
+  // Tube + glow are unit-radius cylinders scaled in x/z by setRadius
+  const tubeMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(1, 1, tubeH, 20),
+    new THREE.MeshBasicMaterial({ color: '#FFFFFF' }),
+  );
+  lamp.add(tubeMesh);
 
-  // Layered additive glow — inner tight halo + outer soft falloff
-  [[0.13, 0.22], [0.3, 0.07]].forEach(([radius, opacity]) => {
-    lamp.add(new THREE.Mesh(
-      new THREE.CylinderGeometry(radius, radius, tubeH, 20),
+  // Layered additive glow — inner tight halo + outer soft falloff,
+  // each padded outward from the tube surface
+  const glows = [[0.08, 0.22], [0.25, 0.07]].map(([pad, opacity]) => {
+    const g = new THREE.Mesh(
+      new THREE.CylinderGeometry(1, 1, tubeH, 20),
       new THREE.MeshBasicMaterial({
-        color: '#9FB4FF',
+        color: '#FFFFFF',
         transparent: true,
         opacity,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       }),
-    ));
+    );
+    g.userData.pad = pad;
+    lamp.add(g);
+    return g;
   });
 
-  // Point lights distributed along the tube axis to approximate a linear emitter.
-  // They stay inside the lamp group so they follow its rotation automatically.
+  // Shadow-mapped samples approximating the fluorescent tube: spread along
+  // the axis (a line emitter is soft along its length even at radius 0) and
+  // pushed outward radially by setRadius, so a thicker tube also softens
+  // shadows across the axis. Staggered angles keep the 5 samples covering
+  // the whole cross-section instead of one side.
   const halfSpan = tubeH / 2 - 0.2;
+  const lights = [];
   for (let i = -2; i <= 2; i++) {
-    const l = new THREE.PointLight('#AABBFF', 1.2, 6, 1.5);
-    l.position.y = (i / 2) * halfSpan;
+    const l = new THREE.PointLight('#FFFFFF', 1.2, 6, 1.5);
+    l.castShadow = true;
+    l.shadow.mapSize.set(256, 256);
+    const a = (i + 2) * ((Math.PI * 2) / 5);
+    l.userData.axialY = (i / 2) * halfSpan;
+    l.userData.dir = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
     lamp.add(l);
+    lights.push(l);
   }
 
   // Radial emission arrows — perpendicular to the tube axis, none at the ends
+  const arrows = [];
   [-0.7, 0, 0.7].forEach(y => {
     [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dz]) => {
       const dir = new THREE.Vector3(dx, 0, dz);
-      const origin = new THREE.Vector3(dx * 0.38, y, dz * 0.38);
-      lamp.add(mkArrow(dir, origin, 0.55, 0x9FB4FF, 0.5));
+      const arrow = mkArrow(dir, dir, 0.55, 0xFFC878, 0.5);
+      arrow.userData.dir = dir;
+      arrow.userData.axialY = y;
+      lamp.add(arrow);
+      arrows.push(arrow);
     });
   });
+
+  function setRadius(r) {
+    const visR = Math.max(r, 0.02); // keep the tube visible at radius 0
+    tubeMesh.scale.set(visR, 1, visR);
+    glows.forEach(g => g.scale.set(visR + g.userData.pad, 1, visR + g.userData.pad));
+    lights.forEach(l => {
+      l.position.copy(l.userData.dir).multiplyScalar(r);
+      l.position.y = l.userData.axialY;
+    });
+    arrows.forEach(a => {
+      a.position.copy(a.userData.dir).multiplyScalar(visR + 0.12);
+      a.position.y = a.userData.axialY;
+    });
+  }
+  setRadius(0.05);
 
   function applyRotation(deg) {
     lamp.rotation.z = (deg * Math.PI) / 180;
@@ -360,6 +405,7 @@ function mkCylinder(canvas) {
   applyRotation(0);
 
   return mkRunner(base, (id, val) => {
+    if (id === 'radius') setRadius(val);
     if (id === 'rotation') applyRotation(val);
     if (id === 'posX') lamp.position.x = val;
   });
@@ -422,7 +468,6 @@ const FACTORIES = {
   distant: mkDistant,
   sphere: mkSphere,
   rect: mkRect,
-  disk: mkDisk,
   cylinder: mkCylinder,
   dome: mkDome,
 };

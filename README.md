@@ -2,7 +2,7 @@
 
 > *The partial shadow between full illumination and complete darkness — where every light source reveals its true shape.*
 
-An interactive reference for the six fundamental light source types used in 3D rendering. Each light is demonstrated with a live Three.js scene, adjustable parameters, anatomy diagrams, and physics explanations.
+An interactive reference for the five fundamental light source types used in 3D rendering. Each light is demonstrated with a live Three.js scene, adjustable parameters, anatomy diagrams, and physics explanations.
 
 ## Live Demo
 
@@ -15,10 +15,9 @@ Deployed to GitHub Pages via the `main` branch CI pipeline.
 | Type | Three.js Equivalent | Key Trait |
 |---|---|---|
 | **Distant** | `DirectionalLight` | Parallel rays, no attenuation |
-| **Sphere** | `PointLight` (decay = 2) | Omnidirectional, inverse-square falloff |
-| **Rect** | `RectAreaLight` | Soft shadows, uniform surface emission |
-| **Disk** | `SpotLight` + penumbra | Circular footprint, adjustable cone |
-| **Cylinder** | Multiple `PointLight`s along axis | Radial-only emission, directional shadows |
+| **Sphere** | `PointLight` samples on sphere surface (decay = 2) | Omnidirectional, inverse-square falloff; radius widens the penumbra |
+| **Rect** | `RectAreaLight` | Uniform surface emission (no shadow support in three.js) |
+| **Cylinder** | Shadow-mapped `PointLight`s along axis | Radial-only emission; radius softens shadows across the axis |
 | **Dome** | `HemisphereLight` | Upper-hemisphere fill, no directional shadows |
 
 ## Development
@@ -52,7 +51,7 @@ Home partitions mounted `noexec` prevent esbuild's native binary from running di
 ```
 src/
   main.js      Entry point: DOM generation, tab switching, scene wiring
-  scenes.js    Six Three.js WebGL scenes (one renderer per light type)
+  scenes.js    Five Three.js WebGL scenes (one renderer per light type)
   ui.js        Modals — math principles (💡), anatomy, compare table
   data.js      Light source content: descriptions, params, SVG diagrams, math copy
   style.css    All styles; Nord-inspired dark palette
