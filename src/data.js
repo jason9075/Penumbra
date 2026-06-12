@@ -186,7 +186,8 @@ export const LIGHT_DATA = [
     uses: ['Ceiling downlights', 'Stage follow spot', 'Theatrical disc light'],
     params: [
       { id: 'angle', label: 'Cone Angle', unit: '°', min: 5, max: 60, default: 22 },
-      { id: 'height', label: 'Height', unit: ' m', min: 1, max: 6, step: 0.1, default: 3.5 },
+      { id: 'height', label: 'Height', unit: ' m', min: 1, max: 4, step: 0.1, default: 2.5 },
+      { id: 'posX', label: 'Position X', unit: ' m', min: -2.5, max: 2.5, step: 0.1, default: 0 },
     ],
     table: {
       shape: 'Circle',
@@ -236,6 +237,7 @@ export const LIGHT_DATA = [
     uses: ['Fluorescent tubes', 'Neon / LED strips', 'Backlit panel edges'],
     params: [
       { id: 'rotation', label: 'Rotation', unit: '°', min: 0, max: 180, default: 0 },
+      { id: 'posX', label: 'Position X', unit: ' m', min: -2.5, max: 2.5, step: 0.1, default: 0 },
     ],
     table: {
       shape: 'Cylinder',
@@ -293,6 +295,8 @@ export const LIGHT_DATA = [
         ],
         default: 'neutral',
       },
+      { id: 'intensity', label: 'Intensity', unit: '', min: 0.2, max: 4, step: 0.1, default: 2 },
+      { id: 'tilt', label: 'Tilt', unit: '°', min: 0, max: 90, step: 1, default: 0 },
     ],
     table: {
       shape: 'Hemisphere',

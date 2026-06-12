@@ -299,7 +299,10 @@ body {
 .light-canvas.active {
   opacity: 1;
   visibility: visible;
+  cursor: grab;
 }
+
+.light-canvas.active:active { cursor: grabbing; }
 
 .demo-stage::after {
   content: '';
