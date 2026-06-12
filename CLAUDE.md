@@ -66,4 +66,4 @@ Defined as CSS custom properties in `src/style.css`:
 
 ## Deployment
 
-`vite.config.js` sets `base: '/Light/'` for GitHub Pages. The GitHub Actions workflow (`.github/workflows/deploy.yml`) triggers on push to `main`, runs `npm ci && npm run build`, and uploads `dist/` via `actions/upload-pages-artifact`.
+`vite.config.js` sets `base: '/Penumbra/'` for GitHub Pages (https://jason9075.github.io/Penumbra/). The GitHub Actions workflow (`.github/workflows/deploy.yml`) triggers on push to `main`, runs `npm ci && npm run build`, and uploads `dist/` via `actions/upload-pages-artifact`.

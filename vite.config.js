@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: process.env.NODE_ENV === 'production' ? '/Light/' : '/',
+  base: process.env.NODE_ENV === 'production' ? '/Penumbra/' : '/',
   server: {
     port: 8080,
   },

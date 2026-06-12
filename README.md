@@ -1,8 +1,12 @@
-# Light — Interactive Light Types Explorer
+# Penumbra
 
-A single-page interactive reference for the six fundamental light source types used in 3D rendering. Each light is demonstrated with a live Three.js scene, adjustable parameters, anatomy diagrams, and physics explanations.
+> *The partial shadow between full illumination and complete darkness — where every light source reveals its true shape.*
+
+An interactive reference for the six fundamental light source types used in 3D rendering. Each light is demonstrated with a live Three.js scene, adjustable parameters, anatomy diagrams, and physics explanations.
 
 ## Live Demo
+
+**https://jason9075.github.io/Penumbra/**
 
 Deployed to GitHub Pages via the `main` branch CI pipeline.
 

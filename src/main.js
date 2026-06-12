@@ -21,7 +21,7 @@ function buildDOM() {
   document.body.innerHTML = `
     <div id="app">
       <header class="site-header">
-        <span class="site-logo">Light</span>
+        <span class="site-logo">Penumbra</span>
         <span class="site-sub">Interactive Light Types Explorer</span>
         <button id="open-compare" class="header-btn" type="button"
           aria-haspopup="dialog">Compare</button>
