@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RectAreaLightHelper } from 'three/addons/helpers/RectAreaLightHelper.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+
+import esplanadeHdr from '../hdri/royal_esplanade_1k.hdr?url';
+import sunsetHdr from '../hdri/venice_sunset_1k.hdr?url';
+import nightHdr from '../hdri/moonless_golf_1k.hdr?url';
 
 /* ── Shared geometry ── */
 const GROUND_GEO = new THREE.PlaneGeometry(14, 14);
@@ -411,55 +416,65 @@ function mkCylinder(canvas) {
   });
 }
 
-/* ── Dome (Hemisphere Light) ── */
+/* ── Dome (HDRI Environment / IBL) ── */
 const DOME_PRESETS = {
-  neutral: { sky: '#CCDDF0', ground: '#2A2D3C', bg: '#0C1220' },
-  sunset: { sky: '#FF9944', ground: '#441808', bg: '#160604' },
-  night: { sky: '#1A2A55', ground: '#060810', bg: '#030408' },
+  neutral: { url: esplanadeHdr, accent: '#CCDDF0' },
+  sunset: { url: sunsetHdr, accent: '#FF9944' },
+  night: { url: nightHdr, accent: '#5577CC' },
 };
 
 function mkDome(canvas) {
   const base = mkBase(canvas, '#0C1220');
   const { scene } = base;
 
+  // The environment map IS the light source — kill the analytic fill light
   scene.children
     .filter(c => c.isAmbientLight)
-    .forEach(a => { a.intensity = 0.2; });
+    .forEach(a => { a.intensity = 0; });
 
-  // Wrap the hemisphere light in a group so we can tilt the sky/ground axis
-  // without affecting scene geometry.
-  const domeGroup = new THREE.Group();
-  scene.add(domeGroup);
+  scene.environmentIntensity = 1;
+  scene.backgroundIntensity = 1;
 
-  const hemi = new THREE.HemisphereLight('#CCDDF0', '#2A2D3C', 2.0);
-  domeGroup.add(hemi);
 
-  // Wireframe dome follows the same group so its orientation always matches
-  const domeGeo = new THREE.SphereGeometry(2.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-  const domeMat = new THREE.MeshBasicMaterial({ color: '#88AAFF', wireframe: true, transparent: true, opacity: 0.07 });
-  const domeMesh = new THREE.Mesh(domeGeo, domeMat);
-  domeMesh.position.y = -1.2;
-  domeGroup.add(domeMesh);
+  // HDRIs are lazy-loaded per preset and cached as promises so rapid preset
+  // switching never double-fetches; `current` guards against a slow load
+  // finishing after a newer selection.
+  const loader = new RGBELoader();
+  const cache = new Map();
+  let current = null;
 
-  // Arrow indicating sky-light direction (top of the dome)
-  const skyArrow = mkArrow(new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 2.2, 0), 1.0, 0x88AAFF, 0.6);
-  domeGroup.add(skyArrow);
-
-  function applyPreset(name) {
+  async function applyPreset(name) {
     const p = DOME_PRESETS[name];
     if (!p) return;
-    hemi.color.set(p.sky);
-    hemi.groundColor.set(p.ground);
-    scene.background.set(p.bg);
-    domeMat.color.set(p.sky);
-    skyArrow.setColor(new THREE.Color(p.sky));
+    current = name;
+    if (!cache.has(name)) {
+      cache.set(name, loader.loadAsync(p.url).then(tex => {
+        tex.mapping = THREE.EquirectangularReflectionMapping;
+        return tex;
+      }));
+    }
+    try {
+      const tex = await cache.get(name);
+      if (current !== name) return;
+      scene.environment = tex;
+      scene.background = tex;
+    } catch (e) {
+      console.error(`Failed to load HDRI preset "${name}":`, e);
+    }
   }
   applyPreset('neutral');
 
   return mkRunner(base, (id, val) => {
     if (id === 'preset') applyPreset(val);
-    if (id === 'intensity') hemi.intensity = val;
-    if (id === 'tilt') domeGroup.rotation.z = (val * Math.PI) / 180;
+    if (id === 'intensity') {
+      scene.environmentIntensity = val;
+      scene.backgroundIntensity = val;
+    }
+    if (id === 'tilt') {
+      const r = (val * Math.PI) / 180;
+      scene.environmentRotation.set(0, r, 0);
+      scene.backgroundRotation.set(0, r, 0);
+    }
   });
 }
 

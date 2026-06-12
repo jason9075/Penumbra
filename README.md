@@ -18,7 +18,7 @@ Deployed to GitHub Pages via the `main` branch CI pipeline.
 | **Sphere** | `PointLight` samples on sphere surface (decay = 2) | Omnidirectional, inverse-square falloff; radius widens the penumbra |
 | **Rect** | `RectAreaLight` | Uniform surface emission (no shadow support in three.js) |
 | **Cylinder** | Shadow-mapped `PointLight`s along axis | Radial-only emission; radius softens shadows across the axis |
-| **Dome** | `HemisphereLight` | Upper-hemisphere fill, no directional shadows |
+| **Dome** | HDRI IBL (`scene.environment`) | Image-based diffuse + specular, no shadows |
 
 ## Development
 
@@ -55,6 +55,8 @@ src/
   ui.js        Modals — math principles (💡), anatomy, compare table
   data.js      Light source content: descriptions, params, SVG diagrams, math copy
   style.css    All styles; Nord-inspired dark palette
+hdri/
+  *.hdr        CC0 environment maps from Poly Haven (see hdri/README.md)
 scripts/
   fix-noexec.cjs   NixOS noexec workaround for esbuild / native .node modules
 ```

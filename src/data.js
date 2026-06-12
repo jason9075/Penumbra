@@ -234,22 +234,22 @@ export const LIGHT_DATA = [
       <path d="M-18 8 A18 18 0 0 1 18 8"/>
       ${Array.from({length:7},(_,i)=>{const a=Math.PI*(i+1)/8,x=Math.cos(a)*18,y=Math.sin(a)*18,cx=Math.cos(a)*8,cy=Math.sin(a)*8;return `<line x1="${+x.toFixed(1)}" y1="${+(-y).toFixed(1)}" x2="${+cx.toFixed(1)}" y2="${+(-cy).toFixed(1)}"/>`}).join('')}
     </svg>`,
-    shape: 'Upper hemisphere floods the scene with sky-scattered diffuse light. No single source direction — everything is bathed uniformly from above.',
+    shape: 'The surrounding environment itself is the light source: every pixel of a panoramic image contributes radiance from its direction. This demo uses real HDRI environment maps (CC0, Poly Haven) via image-based lighting — diffuse and specular both come from the image.',
     uses: ['HDRI environment', 'Overcast sky', 'Ambient fill'],
     params: [
       {
         id: 'preset',
-        label: 'Sky Preset',
+        label: 'Environment',
         type: 'preset',
         options: [
-          { value: 'neutral', label: 'Neutral' },
+          { value: 'neutral', label: 'Indoor' },
           { value: 'sunset', label: 'Sunset' },
           { value: 'night', label: 'Night' },
         ],
         default: 'neutral',
       },
-      { id: 'intensity', label: 'Intensity', unit: '', min: 0.2, max: 4, step: 0.1, default: 2 },
-      { id: 'tilt', label: 'Tilt', unit: '°', min: 0, max: 90, step: 1, default: 0 },
+      { id: 'intensity', label: 'Intensity', unit: '', min: 0, max: 3, step: 0.1, default: 1 },
+      { id: 'tilt', label: 'Rotation', unit: '°', min: 0, max: 360, step: 1, default: 0 },
     ],
     table: {
       shape: 'Hemisphere',
@@ -278,9 +278,48 @@ export const LIGHT_DATA = [
     </svg>`,
     mathEn: `<p>A dome light integrates incoming radiance over the upper hemisphere. Using the rendering equation for a diffuse receiver:</p>
       <p>$$L_o = \\int_{\\Omega^+} L_i(\\hat{\\omega}_i)\\,f_r\\,\\cos\\theta_i\\,d\\omega_i$$</p>
-      <p>For a uniform dome of radiance $L_{sky}$, this simplifies to $L_o = \\pi\\,L_{sky}\\,f_r$ — every visible surface receives an equal contribution from the sky. No directionality means <strong>no sharp shadows</strong>; only soft ambient occlusion remains.</p>`,
+      <p>For a uniform dome of radiance $L_{sky}$, this simplifies to $L_o = \\pi\\,L_{sky}\\,f_r$ — every visible surface receives an equal contribution from the sky. No directionality means <strong>no sharp shadows</strong>; only soft ambient occlusion remains.</p>
+      <p>This demo implements the general case — <strong>image-based lighting (IBL)</strong>: $L_i(\\hat{\\omega}_i)$ is sampled from a real HDRI panorama assigned to <code>scene.environment</code>. Three.js prefilters the map (PMREM) so roughness maps to a blur level, giving both diffuse irradiance and glossy reflections. Like all environment lights in a rasterizer, it <strong>casts no shadows</strong> — production scenes pair an HDRI with one shadow-mapped <code>DirectionalLight</code> aligned to the sun.</p>
+      <p><strong>Three.js IBL setup:</strong></p>
+      <pre><code class="language-js">import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+
+const loader = new RGBELoader();
+const texture = await loader.loadAsync('scene.hdr');
+texture.mapping = THREE.EquirectangularReflectionMapping;
+
+// Drives both diffuse irradiance and specular reflections on
+// MeshStandardMaterial / MeshPhysicalMaterial
+scene.environment = texture;
+
+// Optional: also use the panorama as the visible background
+scene.background = texture;
+
+// Fine-tune without reloading the texture (r163+)
+scene.environmentIntensity = 1.0;
+scene.environmentRotation.set(0, Math.PI / 2, 0); // rotate sun position
+</code></pre>
+      <p>Three.js automatically runs <code>PMREMGenerator</code> on the first frame to produce a prefiltered mip chain. Each mip level corresponds to a roughness value — roughness 0 samples the sharpest mip (mirror reflection), roughness 1 samples the most blurred (fully diffuse).</p>`,
     mathZh: `<p>穹頂光源對上半球的入射輻射進行積分。對於漫反射接收面，使用渲染方程：</p>
       <p>$$L_o = \\int_{\\Omega^+} L_i(\\hat{\\omega}_i)\\,f_r\\,\\cos\\theta_i\\,d\\omega_i$$</p>
-      <p>對於均勻穹頂輻射 $L_{sky}$，化簡為 $L_o = \\pi\\,L_{sky}\\,f_r$ — 所有可見表面從天空獲得相同貢獻。無方向性意味著<strong>無清晰陰影</strong>，只剩下柔和的環境光遮蔽。</p>`,
+      <p>對於均勻穹頂輻射 $L_{sky}$，化簡為 $L_o = \\pi\\,L_{sky}\\,f_r$ — 所有可見表面從天空獲得相同貢獻。無方向性意味著<strong>無清晰陰影</strong>，只剩下柔和的環境光遮蔽。</p>
+      <p>本 demo 實作的是一般情況——<strong>影像式照明（IBL）</strong>：$L_i(\\hat{\\omega}_i)$ 直接取樣自指定給 <code>scene.environment</code> 的真實 HDRI 全景圖。Three.js 會對貼圖做預過濾（PMREM），讓粗糙度對應到模糊層級，同時提供漫反射照度與光澤反射。如同所有 rasterizer 的環境光，它<strong>不投射陰影</strong>——實務上會搭配一顆對齊太陽方位、帶 shadow map 的 <code>DirectionalLight</code>。</p>
+      <p><strong>Three.js IBL 設置方式：</strong></p>
+      <pre><code class="language-js">import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+
+const loader = new RGBELoader();
+const texture = await loader.loadAsync('scene.hdr');
+texture.mapping = THREE.EquirectangularReflectionMapping;
+
+// 同時驅動 MeshStandardMaterial / MeshPhysicalMaterial 的漫反射與鏡面反射
+scene.environment = texture;
+
+// 可選：也作為可見背景
+scene.background = texture;
+
+// 不重新載入貼圖即可微調（r163+）
+scene.environmentIntensity = 1.0;
+scene.environmentRotation.set(0, Math.PI / 2, 0); // 旋轉太陽位置
+</code></pre>
+      <p>Three.js 會在第一幀自動執行 <code>PMREMGenerator</code>，產生預過濾的 mip chain。每個 mip 層級對應一個粗糙度值——roughness 0 取樣最銳利的 mip（鏡面反射），roughness 1 取樣最模糊的 mip（完全漫反射）。</p>`,
   },
 ];
